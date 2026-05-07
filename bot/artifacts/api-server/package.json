@@ -1,0 +1,33 @@
+{
+  "name": "@workspace/api-server",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "export NODE_ENV=development && pnpm run build && pnpm run start",
+    "build": "node ./build.mjs",
+    "start": "node --enable-source-maps ./dist/index.mjs",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@discord-player/extractor": "^7.2.0",
+    "@discord-player/ffmpeg": "^7.2.0",
+    "@snazzah/davey": "^0.1.11",
+    "discord-player": "^7.2.0",
+    "discord-player-youtubei": "^2.0.0",
+    "discord.js": "^14.26.4",
+    "ffmpeg-static": "^5.3.0",
+    "jsdom": "^29.1.1",
+    "mediaplex": "^1.0.0",
+    "openai": "^6.36.0",
+    "pino": "^9",
+    "youtube-dl-exec": "^3.1.6"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "esbuild": "^0.27.3",
+    "esbuild-plugin-pino": "^2.3.3",
+    "pino-pretty": "^13",
+    "thread-stream": "3.1.0"
+  }
+}
