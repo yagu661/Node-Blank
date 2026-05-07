@@ -7,3 +7,11 @@ expertMode = true
 
 [userenv.shared]
 GUILD_ID = "1498904036118892647"
+
+[[ports]]
+localPort = 8080
+externalPort = 8080
+
+[[ports]]
+localPort = 8081
+externalPort = 80
