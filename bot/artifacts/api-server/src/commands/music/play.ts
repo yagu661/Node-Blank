@@ -12,7 +12,7 @@ const CACHE_TTL = 30_000;
 export const play: Command = {
   data: new SlashCommandBuilder()
     .setName("play")
-    .setDescription("🎵 Search for a song or paste a URL — supports YouTube, Spotify and SoundCloud")
+    .setDescription("🎵 Search Spotify, YouTube or paste a URL — Spotify-first, highest quality audio")
     .addStringOption((o) =>
       o.setName("query").setDescription("Song name, artist, or URL — even with typos!").setRequired(true).setAutocomplete(true)
     ),
@@ -32,17 +32,31 @@ export const play: Command = {
       const player = useMainPlayer();
       if (!player) return interaction.respond([]);
 
-      // Use YouTube search for autocomplete — it always works without extra credentials
       const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), 2500));
-      const search  = player.search(query, {
+
+      // Try Spotify first — better metadata, album art, accurate artist names
+      const spotifySearch = player.search(query, {
         requestedBy:  interaction.user,
-        searchEngine: QueryType.YOUTUBE_SEARCH,
+        searchEngine: QueryType.SPOTIFY_SEARCH,
       });
 
-      const result = await Promise.race([search, timeout]);
-      if (!result || result === null) return interaction.respond([]);
+      let result = await Promise.race([spotifySearch, timeout]);
 
-      const choices = (result as Awaited<typeof search>).tracks.slice(0, 10).map((t) => ({
+      // Fall back to YouTube if Spotify returned nothing (e.g. credentials not set)
+      if (!result || (result as Awaited<typeof spotifySearch>).isEmpty()) {
+        const ytSearch = player.search(query, {
+          requestedBy:  interaction.user,
+          searchEngine: QueryType.YOUTUBE_SEARCH,
+        });
+        const ytResult = await Promise.race([ytSearch, new Promise<null>((r) => setTimeout(() => r(null), 2000))]);
+        if (ytResult) result = ytResult as Awaited<typeof spotifySearch>;
+      }
+
+      if (!result || (result as Awaited<typeof spotifySearch>).isEmpty()) {
+        return interaction.respond([]);
+      }
+
+      const choices = (result as Awaited<typeof spotifySearch>).tracks.slice(0, 10).map((t) => ({
         name: `${t.title} — ${t.author} (${t.duration})`.slice(0, 100),
         value: t.url,
       }));
@@ -93,32 +107,33 @@ export const play: Command = {
     const query          = correctedQuery || rawQuery;
     const wasCorrected   = !isUrl && query.toLowerCase() !== rawQuery.toLowerCase();
 
-    // Determine search engine based on input
-    let searchEngine = QueryType.YOUTUBE_SEARCH;
+    // Determine search engine based on the input
+    let searchEngine: QueryType;
     if (isUrl) {
-      if (rawQuery.includes("spotify.com")) searchEngine = QueryType.SPOTIFY_SONG;
+      if (rawQuery.includes("spotify.com"))     searchEngine = QueryType.SPOTIFY_SONG;
       else if (rawQuery.includes("soundcloud.com")) searchEngine = QueryType.SOUNDCLOUD_TRACK;
-      else searchEngine = QueryType.YOUTUBE;
-    } else if (rawQuery.includes("spotify.com")) {
+      else                                      searchEngine = QueryType.YOUTUBE;
+    } else {
+      // Text query — always try Spotify first for better metadata & quality
       searchEngine = QueryType.SPOTIFY_SEARCH;
     }
 
-    const searchOpts = {
-      requestedBy:  interaction.user,
-      searchEngine,
-    };
+    let result = await player!.search(query, { requestedBy: interaction.user, searchEngine });
 
-    let result = await player!.search(query, searchOpts);
-
-    // If Spotify search returned nothing, fallback to YouTube
+    // If Spotify returned nothing (no credentials or no match), fall back to YouTube
     if (result.isEmpty() && searchEngine === QueryType.SPOTIFY_SEARCH) {
       result = await player!.search(query, { requestedBy: interaction.user, searchEngine: QueryType.YOUTUBE_SEARCH });
     }
 
+    // If AI-corrected query also returned nothing, try the original raw query
     if (result.isEmpty() && wasCorrected) {
-      const fallback = await player!.search(rawQuery, { requestedBy: interaction.user, searchEngine: QueryType.YOUTUBE_SEARCH });
+      const fallback = await player!.search(rawQuery, { requestedBy: interaction.user, searchEngine: QueryType.SPOTIFY_SEARCH });
       if (!fallback.isEmpty()) {
         return continuePlay(interaction, voiceChannel, player!, fallback, rawQuery, false);
+      }
+      const ytFallback = await player!.search(rawQuery, { requestedBy: interaction.user, searchEngine: QueryType.YOUTUBE_SEARCH });
+      if (!ytFallback.isEmpty()) {
+        return continuePlay(interaction, voiceChannel, player!, ytFallback, rawQuery, false);
       }
     }
 
@@ -201,9 +216,9 @@ async function continuePlay(
         .setDescription(`> **[${track.title}](${track.url})**\n> by **${track.author}**${correctionNote}`)
         .setThumbnail(track.thumbnail)
         .addFields(
-          { name: "⏱️ Duration",    value: track.duration,        inline: true },
+          { name: "⏱️ Duration",     value: track.duration,        inline: true },
           { name: "👤 Requested by", value: `${interaction.user}`, inline: true },
-          { name: "♾️ AI Autoplay", value: "On — genre-matched songs auto-queue", inline: false },
+          { name: "♾️ AI Autoplay",  value: "On — genre-matched songs auto-queue", inline: false },
         )
         .setTimestamp()
         .setFooter({ text: `⚡ ${config.embedFooter}` }),
