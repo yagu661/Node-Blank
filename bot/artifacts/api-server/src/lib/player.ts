@@ -115,19 +115,14 @@ export async function initPlayer(client: BotClient): Promise<Player> {
   const player = new Player(client, { skipFFmpeg: false, ffmpegPath });
 
   // Register YoutubeiExtractor FIRST — it handles actual audio streaming.
-  // IOS client returns direct stream URLs — no signature deciphering needed.
-  // disablePlayer skips fetching YouTube's player JS entirely, which is what
-  // causes the silent "Failed to extract signature/n decipher" failures.
+  // useYoutubeDL: true routes all streams through yt-dlp which bypasses
+  // YouTube's server-side IP blocking that causes "operation was aborted".
   await player.extractors.register(YoutubeiExtractor, {
+    useYoutubeDL: true,
     disablePlayer: true,
     streamOptions: {
       useClient: "IOS" as any,
       highWaterMark: 1 << 25,
-    },
-    overrideDownloadOptions: {
-      quality: "best",
-      format: "mp4",
-      type: "audio",
     },
   });
 

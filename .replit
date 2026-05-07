@@ -7,6 +7,7 @@ expertMode = true
 
 [userenv.shared]
 GUILD_ID = "1498904036118892647"
+YOUTUBE_DL_PATH = "/nix/store/am2x1y1qyja0hbyjpffj7rcvycp9d644-yt-dlp-2025.6.30/bin/yt-dlp"
 
 [[ports]]
 localPort = 8080
@@ -15,3 +16,6 @@ externalPort = 8080
 [[ports]]
 localPort = 8081
 externalPort = 80
+
+[nix]
+channel = "stable-25_05"
