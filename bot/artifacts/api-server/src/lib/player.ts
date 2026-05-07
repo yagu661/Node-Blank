@@ -6,6 +6,8 @@ import { config } from "../config";
 import { getRelatedSongs } from "./ai";
 import type { BotClient } from "../client";
 import { createRequire } from "node:module";
+import { spawn } from "node:child_process";
+import { Readable } from "node:stream";
 
 AudioFilters.define("bassboost" as any, "bass=g=20,dynaudnorm=f=200");
 AudioFilters.define("8d"        as any, "apulsator=hz=0.08");
@@ -14,6 +16,44 @@ AudioFilters.define("pitch"     as any, "asetrate=48000*1.15,aresample=48000");
 
 const _require = createRequire(import.meta.url);
 const ffmpegPath: string = _require("ffmpeg-static");
+
+// Find yt-dlp: prefer explicit env var, then PATH
+const YTDLP_PATH = process.env.YOUTUBE_DL_PATH ?? "yt-dlp";
+
+function createYtDlpStream(url: string): Readable {
+  // Extract bare video ID/URL for yt-dlp
+  let videoUrl = url;
+  try {
+    const u = new URL(url);
+    const v = u.searchParams.get("v");
+    if (v) videoUrl = `https://www.youtube.com/watch?v=${v}`;
+  } catch {}
+
+  const proc = spawn(YTDLP_PATH, [
+    videoUrl,
+    "--format", "bestaudio[ext=webm]/bestaudio/best",
+    "--output", "-",
+    "--quiet",
+    "--no-warnings",
+    "--no-playlist",
+  ], { stdio: ["ignore", "pipe", "pipe"] });
+
+  proc.stderr.on("data", (d) => {
+    const msg = d.toString().trim();
+    if (msg) console.error("[yt-dlp]", msg);
+  });
+
+  const stream = proc.stdout as Readable;
+  const cleanup = () => { if (!proc.killed) proc.kill("SIGKILL"); };
+  stream.on("close", cleanup);
+  stream.on("error", cleanup);
+  proc.on("error", (err) => {
+    console.error("[yt-dlp spawn error]", err.message);
+    stream.destroy(err);
+  });
+
+  return stream;
+}
 
 const autoplaying = new Set<string>();
 
@@ -114,20 +154,20 @@ async function handleAIAutoplay(queue: any, lastTrack: any) {
 export async function initPlayer(client: BotClient): Promise<Player> {
   const player = new Player(client, { skipFFmpeg: false, ffmpegPath });
 
-  // Register YoutubeiExtractor FIRST — it handles actual audio streaming.
-  // useYoutubeDL: true routes all streams through yt-dlp which bypasses
-  // YouTube's server-side IP blocking that causes "operation was aborted".
+  // Register YoutubeiExtractor FIRST for search/metadata.
+  // createStream bypasses all internal youtubei streaming by spawning yt-dlp
+  // directly — this avoids IP blocking, signature decipher failures, and
+  // youtube-dl-exec binary lookup issues.
   await player.extractors.register(YoutubeiExtractor, {
-    useYoutubeDL: true,
     disablePlayer: true,
-    streamOptions: {
-      useClient: "IOS" as any,
-      highWaterMark: 1 << 25,
+    createStream: async (track: any) => {
+      console.log(`[yt-dlp] Streaming: ${track.title} — ${track.url}`);
+      return createYtDlpStream(track.url);
     },
-  });
+  } as any);
 
-  // Spotify and SoundCloud are metadata-only and must be registered AFTER
-  // YoutubeiExtractor so they can delegate streaming to it.
+  // Spotify and SoundCloud are metadata-only — registered AFTER YoutubeiExtractor
+  // so they delegate actual audio streaming to it.
   await player.extractors.register(SoundCloudExtractor, {});
   await player.extractors.register(SpotifyExtractor, {});
 
