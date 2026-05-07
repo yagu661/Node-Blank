@@ -7,6 +7,7 @@ import { getRelatedSongs } from "./ai";
 import type { BotClient } from "../client";
 import { createRequire } from "node:module";
 import { spawn } from "node:child_process";
+import type { Readable } from "node:stream";
 
 AudioFilters.define("bassboost" as any, "bass=g=20,dynaudnorm=f=200");
 AudioFilters.define("8d"        as any, "apulsator=hz=0.08");
@@ -14,43 +15,68 @@ AudioFilters.define("echo"      as any, "aecho=0.8:0.9:1000:0.3");
 AudioFilters.define("pitch"     as any, "asetrate=48000*1.15,aresample=48000");
 
 const _require = createRequire(import.meta.url);
-const ffmpegPath: string = _require("ffmpeg-static");
+const ffmpegBin: string = _require("ffmpeg-static");
 
-// Find yt-dlp: prefer explicit env var, then PATH
 const YTDLP_PATH = process.env.YOUTUBE_DL_PATH ?? "yt-dlp";
 
 /**
- * Run yt-dlp --get-url to resolve a direct/HLS stream URL.
- * Returns the URL string so discord-player can pass it straight to ffmpeg.
- * ffmpeg handles HLS manifests natively, so no piping is needed.
+ * Pipe yt-dlp into ffmpeg to produce a raw PCM (s16le 48kHz stereo) stream.
+ *
+ * Returning { $fmt: "pcm", stream } tells discord-player (v7, skipFFmpeg: true
+ * default) to use the stream directly — it skips its own internal ffmpeg pass
+ * entirely.  This works around YouTube blocking ffmpeg's direct HTTP access to
+ * CDN URLs while still letting yt-dlp (which uses its own HTTP client) fetch
+ * the audio data.
  */
-async function getYtDlpStreamUrl(videoUrl: string): Promise<string> {
-  return new Promise((resolve, reject) => {
-    let stdout = "";
-    let stderr = "";
+function createPcmStream(videoUrl: string): { $fmt: string; stream: Readable } {
+  let url = videoUrl;
+  try {
+    const u = new URL(videoUrl);
+    const v = u.searchParams.get("v");
+    if (v) url = `https://www.youtube.com/watch?v=${v}`;
+  } catch {}
 
-    const proc = spawn(YTDLP_PATH, [
-      videoUrl,
-      "--format", "bestaudio/best",
-      "--get-url",
-      "--no-playlist",
-      "--no-warnings",
-    ], { stdio: ["ignore", "pipe", "pipe"] });
+  console.log(`[yt-dlp] Fetching audio for: ${url}`);
 
-    proc.stdout.on("data", (d: Buffer) => { stdout += d.toString(); });
-    proc.stderr.on("data", (d: Buffer) => { stderr += d.toString(); });
+  const ytdlp = spawn(YTDLP_PATH, [
+    url,
+    "--format", "bestaudio/best",
+    "--output", "-",
+    "--quiet",
+    "--no-playlist",
+  ], { stdio: ["ignore", "pipe", "pipe"] });
 
-    proc.on("close", (code) => {
-      const url = stdout.trim().split("\n")[0]?.trim();
-      if (url && url.startsWith("http")) {
-        resolve(url);
-      } else {
-        reject(new Error(`yt-dlp exited ${code}: ${stderr.trim().slice(0, 200)}`));
-      }
-    });
-
-    proc.on("error", (err) => reject(new Error(`yt-dlp spawn: ${err.message}`)));
+  ytdlp.stderr.on("data", (d: Buffer) => {
+    const msg = d.toString().trim();
+    if (msg && !msg.startsWith("WARNING") && !msg.includes("Broken pipe")) {
+      console.error("[yt-dlp]", msg.slice(0, 200));
+    }
   });
+
+  const ffmpeg = spawn(ffmpegBin, [
+    "-loglevel", "error",
+    "-i", "pipe:0",
+    "-f", "s16le",
+    "-ar", "48000",
+    "-ac", "2",
+    "pipe:1",
+  ], { stdio: ["pipe", "pipe", "pipe"] });
+
+  ytdlp.stdout.pipe(ffmpeg.stdin);
+
+  ytdlp.on("error", (err) => {
+    console.error("[yt-dlp spawn error]", err.message);
+    (ffmpeg.stdin as any).destroy();
+  });
+  ffmpeg.on("error", (err) => {
+    console.error("[ffmpeg spawn error]", err.message);
+  });
+  ffmpeg.stderr.on("data", (d: Buffer) => {
+    const msg = d.toString().trim();
+    if (msg) console.error("[ffmpeg]", msg.slice(0, 200));
+  });
+
+  return { $fmt: "pcm", stream: ffmpeg.stdout as unknown as Readable };
 }
 
 const autoplaying = new Set<string>();
@@ -150,24 +176,24 @@ async function handleAIAutoplay(queue: any, lastTrack: any) {
 }
 
 export async function initPlayer(client: BotClient): Promise<Player> {
-  const player = new Player(client, { skipFFmpeg: false, ffmpegPath });
+  // skipFFmpeg defaults to true in discord-player v7 — we rely on this so our
+  // pre-processed PCM stream bypasses the internal ffmpeg pass entirely.
+  const player = new Player(client);
 
-  // Register YoutubeiExtractor FIRST for search/metadata.
-  // createStream bypasses all internal youtubei streaming by spawning yt-dlp
-  // directly — this avoids IP blocking, signature decipher failures, and
-  // youtube-dl-exec binary lookup issues.
+  // YoutubeiExtractor handles search/metadata.
+  // createStream is called when it's time to produce audio — we pipe yt-dlp
+  // into ffmpeg ourselves and hand back raw PCM.  Discord-player sees
+  // { $fmt: "pcm", stream } and skips its own ffmpeg, feeding the stream
+  // straight into the voice dispatcher.
   await player.extractors.register(YoutubeiExtractor, {
     disablePlayer: true,
     createStream: async (track: any) => {
-      console.log(`[yt-dlp] Resolving URL for: ${track.title} — ${track.url}`);
-      const streamUrl = await getYtDlpStreamUrl(track.url);
-      console.log(`[yt-dlp] Got stream URL (${streamUrl.slice(0, 80)}...)`);
-      return streamUrl;
+      return createPcmStream(track.url);
     },
   } as any);
 
-  // Spotify and SoundCloud are metadata-only — registered AFTER YoutubeiExtractor
-  // so they delegate actual audio streaming to it.
+  // Spotify and SoundCloud provide metadata; they bridge to YoutubeiExtractor
+  // for actual audio, so createStream above handles them too.
   await player.extractors.register(SoundCloudExtractor, {});
   await player.extractors.register(SpotifyExtractor, {});
 
@@ -209,6 +235,7 @@ export async function initPlayer(client: BotClient): Promise<Player> {
   });
 
   player.events.on("playerError", (queue, error) => {
+    console.error("[playerError]", error.message, error.stack);
     const meta = queue.metadata as { channel: any } | null;
     if (!meta?.channel) return;
     const embed = new EmbedBuilder()
@@ -221,6 +248,7 @@ export async function initPlayer(client: BotClient): Promise<Player> {
   });
 
   player.events.on("error", (queue, error) => {
+    console.error("[player event error]", error.message, error.stack);
     const meta = (queue as any).metadata as { channel: any } | null;
     if (!meta?.channel) return;
     const embed = new EmbedBuilder()
