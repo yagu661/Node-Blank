@@ -7,7 +7,6 @@ import { getRelatedSongs } from "./ai";
 import type { BotClient } from "../client";
 import { createRequire } from "node:module";
 import { spawn } from "node:child_process";
-import { Readable } from "node:stream";
 
 AudioFilters.define("bassboost" as any, "bass=g=20,dynaudnorm=f=200");
 AudioFilters.define("8d"        as any, "apulsator=hz=0.08");
@@ -20,39 +19,38 @@ const ffmpegPath: string = _require("ffmpeg-static");
 // Find yt-dlp: prefer explicit env var, then PATH
 const YTDLP_PATH = process.env.YOUTUBE_DL_PATH ?? "yt-dlp";
 
-function createYtDlpStream(url: string): Readable {
-  // Extract bare video ID/URL for yt-dlp
-  let videoUrl = url;
-  try {
-    const u = new URL(url);
-    const v = u.searchParams.get("v");
-    if (v) videoUrl = `https://www.youtube.com/watch?v=${v}`;
-  } catch {}
+/**
+ * Run yt-dlp --get-url to resolve a direct/HLS stream URL.
+ * Returns the URL string so discord-player can pass it straight to ffmpeg.
+ * ffmpeg handles HLS manifests natively, so no piping is needed.
+ */
+async function getYtDlpStreamUrl(videoUrl: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    let stdout = "";
+    let stderr = "";
 
-  const proc = spawn(YTDLP_PATH, [
-    videoUrl,
-    "--format", "bestaudio[ext=webm]/bestaudio/best",
-    "--output", "-",
-    "--quiet",
-    "--no-warnings",
-    "--no-playlist",
-  ], { stdio: ["ignore", "pipe", "pipe"] });
+    const proc = spawn(YTDLP_PATH, [
+      videoUrl,
+      "--format", "bestaudio/best",
+      "--get-url",
+      "--no-playlist",
+      "--no-warnings",
+    ], { stdio: ["ignore", "pipe", "pipe"] });
 
-  proc.stderr.on("data", (d) => {
-    const msg = d.toString().trim();
-    if (msg) console.error("[yt-dlp]", msg);
+    proc.stdout.on("data", (d: Buffer) => { stdout += d.toString(); });
+    proc.stderr.on("data", (d: Buffer) => { stderr += d.toString(); });
+
+    proc.on("close", (code) => {
+      const url = stdout.trim().split("\n")[0]?.trim();
+      if (url && url.startsWith("http")) {
+        resolve(url);
+      } else {
+        reject(new Error(`yt-dlp exited ${code}: ${stderr.trim().slice(0, 200)}`));
+      }
+    });
+
+    proc.on("error", (err) => reject(new Error(`yt-dlp spawn: ${err.message}`)));
   });
-
-  const stream = proc.stdout as Readable;
-  const cleanup = () => { if (!proc.killed) proc.kill("SIGKILL"); };
-  stream.on("close", cleanup);
-  stream.on("error", cleanup);
-  proc.on("error", (err) => {
-    console.error("[yt-dlp spawn error]", err.message);
-    stream.destroy(err);
-  });
-
-  return stream;
 }
 
 const autoplaying = new Set<string>();
@@ -161,8 +159,10 @@ export async function initPlayer(client: BotClient): Promise<Player> {
   await player.extractors.register(YoutubeiExtractor, {
     disablePlayer: true,
     createStream: async (track: any) => {
-      console.log(`[yt-dlp] Streaming: ${track.title} — ${track.url}`);
-      return createYtDlpStream(track.url);
+      console.log(`[yt-dlp] Resolving URL for: ${track.title} — ${track.url}`);
+      const streamUrl = await getYtDlpStreamUrl(track.url);
+      console.log(`[yt-dlp] Got stream URL (${streamUrl.slice(0, 80)}...)`);
+      return streamUrl;
     },
   } as any);
 
