@@ -115,10 +115,11 @@ export async function initPlayer(client: BotClient): Promise<Player> {
   const player = new Player(client, { skipFFmpeg: false, ffmpegPath });
 
   // Register YoutubeiExtractor FIRST — it handles actual audio streaming.
-  // "WEB" client is the most stable for discord-player-youtubei.
+  // TV_EMBEDDED bypasses YouTube's signature decipher requirement entirely,
+  // which is why WEB/ANDROID clients fail silently (they need po_token auth).
   await player.extractors.register(YoutubeiExtractor, {
     streamOptions: {
-      useClient: "WEB" as any,
+      useClient: "TV_EMBEDDED" as any,
       highWaterMark: 1 << 25,
     },
   });
