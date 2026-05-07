@@ -115,12 +115,19 @@ export async function initPlayer(client: BotClient): Promise<Player> {
   const player = new Player(client, { skipFFmpeg: false, ffmpegPath });
 
   // Register YoutubeiExtractor FIRST — it handles actual audio streaming.
-  // TV_EMBEDDED bypasses YouTube's signature decipher requirement entirely,
-  // which is why WEB/ANDROID clients fail silently (they need po_token auth).
+  // IOS client returns direct stream URLs — no signature deciphering needed.
+  // disablePlayer skips fetching YouTube's player JS entirely, which is what
+  // causes the silent "Failed to extract signature/n decipher" failures.
   await player.extractors.register(YoutubeiExtractor, {
+    disablePlayer: true,
     streamOptions: {
-      useClient: "TV_EMBEDDED" as any,
+      useClient: "IOS" as any,
       highWaterMark: 1 << 25,
+    },
+    overrideDownloadOptions: {
+      quality: "best",
+      format: "mp4",
+      type: "audio",
     },
   });
 
