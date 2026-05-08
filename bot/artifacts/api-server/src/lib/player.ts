@@ -1,7 +1,7 @@
 import { Player, AudioFilters } from "discord-player";
 import { YoutubeiExtractor } from "discord-player-youtubei";
 import { SpotifyExtractor, SoundCloudExtractor } from "@discord-player/extractor";
-import { EmbedBuilder } from "discord.js";
+import { EmbedBuilder, Events } from "discord.js";
 import { config } from "../config";
 import { getRelatedSongs } from "./ai";
 import type { BotClient } from "../client";
@@ -21,12 +21,6 @@ const YTDLP_PATH = process.env.YOUTUBE_DL_PATH ?? "yt-dlp";
 
 /**
  * Pipe yt-dlp into ffmpeg to produce a raw PCM (s16le 48kHz stereo) stream.
- *
- * Returning { $fmt: "pcm", stream } tells discord-player (v7, skipFFmpeg: true
- * default) to use the stream directly — it skips its own internal ffmpeg pass
- * entirely.  This works around YouTube blocking ffmpeg's direct HTTP access to
- * CDN URLs while still letting yt-dlp (which uses its own HTTP client) fetch
- * the audio data.
  */
 function createPcmStream(videoUrl: string): { $fmt: string; stream: Readable } {
   let url = videoUrl;
@@ -68,13 +62,22 @@ function createPcmStream(videoUrl: string): { $fmt: string; stream: Readable } {
     console.error("[yt-dlp spawn error]", err.message);
     (ffmpeg.stdin as any).destroy();
   });
+  ytdlp.on("close", (code) => {
+    console.log(`[yt-dlp] exited code=${code}`);
+    if (code !== 0) (ffmpeg.stdin as any).destroy();
+  });
   ffmpeg.on("error", (err) => {
     console.error("[ffmpeg spawn error]", err.message);
+  });
+  ffmpeg.on("close", (code) => {
+    console.log(`[ffmpeg] exited code=${code}`);
   });
   ffmpeg.stderr.on("data", (d: Buffer) => {
     const msg = d.toString().trim();
     if (msg) console.error("[ffmpeg]", msg.slice(0, 200));
   });
+
+  ffmpeg.stdout.on("data", () => {});
 
   return { $fmt: "pcm", stream: ffmpeg.stdout as unknown as Readable };
 }
@@ -176,15 +179,24 @@ async function handleAIAutoplay(queue: any, lastTrack: any) {
 }
 
 export async function initPlayer(client: BotClient): Promise<Player> {
-  // skipFFmpeg defaults to true in discord-player v7 — we rely on this so our
-  // pre-processed PCM stream bypasses the internal ffmpeg pass entirely.
-  const player = new Player(client);
+  const player = new Player(client, {
+    connectionTimeout: 60_000,
+  });
 
-  // YoutubeiExtractor handles search/metadata.
-  // createStream is called when it's time to produce audio — we pipe yt-dlp
-  // into ffmpeg ourselves and hand back raw PCM.  Discord-player sees
-  // { $fmt: "pcm", stream } and skips its own ffmpeg, feeding the stream
-  // straight into the voice dispatcher.
+  player.on("debug" as any, (msg: string) => {
+    console.log("[dp:debug]", msg);
+  });
+
+  client.on(Events.VoiceStateUpdate, (oldState, newState) => {
+    if (newState.member?.user.id === client.user?.id) {
+      console.log(
+        `[voice] Bot VoiceState: guild=${newState.guild.id}` +
+        ` channel=${newState.channelId ?? "null"}` +
+        ` oldChannel=${oldState.channelId ?? "null"}`
+      );
+    }
+  });
+
   await player.extractors.register(YoutubeiExtractor, {
     disablePlayer: true,
     createStream: async (track: any) => {
@@ -192,12 +204,11 @@ export async function initPlayer(client: BotClient): Promise<Player> {
     },
   } as any);
 
-  // Spotify and SoundCloud provide metadata; they bridge to YoutubeiExtractor
-  // for actual audio, so createStream above handles them too.
   await player.extractors.register(SoundCloudExtractor, {});
   await player.extractors.register(SpotifyExtractor, {});
 
   player.events.on("playerStart", (queue, track) => {
+    console.log(`[playerStart] ${track.title}`);
     const meta = queue.metadata as { channel: any } | null;
     if (!meta?.channel) return;
 

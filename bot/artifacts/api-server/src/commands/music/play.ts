@@ -168,6 +168,7 @@ async function continuePlay(
         leaveOnEnd:           !is247,
         leaveOnEndCooldown:   30_000,
         repeatMode:           QueueRepeatMode.OFF,
+        connectionTimeout:    60_000,
       },
     });
   } catch (err: any) {
