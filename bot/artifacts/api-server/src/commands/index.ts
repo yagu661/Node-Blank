@@ -1,6 +1,7 @@
 import { ping } from "./utility/ping";
 import { help } from "./utility/help";
 import { info } from "./utility/info";
+import { status } from "./utility/status";
 import { serverinfo } from "./utility/serverinfo";
 import { userinfo } from "./utility/userinfo";
 import { avatar } from "./utility/avatar";
@@ -45,7 +46,7 @@ import { seek } from "./music/seek";
 import type { Command } from "../types/index";
 
 export const commands: Command[] = [
-  ping, help, info, serverinfo, userinfo, avatar,
+  ping, help, info, status, serverinfo, userinfo, avatar,
   ban, kick, unban, unbanAll,
   mute, unmute,
   warn, clearWarns,
