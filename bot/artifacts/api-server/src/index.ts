@@ -35,10 +35,7 @@ process.on("unhandledRejection", (err) => {
 });
 
 process.on("uncaughtException", (err: NodeJS.ErrnoException) => {
-  if (err.code === "EADDRINUSE") {
-    logger.warn({ port: err.port }, "Port in use — ignoring, bot continues running");
-    return;
-  }
+  if (err.code === "EADDRINUSE") return;
   logger.error({ err }, "Uncaught exception");
   process.exit(1);
 });
@@ -54,29 +51,25 @@ const server = createServer((req, res) => {
   }
 });
 
-function startServer(attempt = 1): void {
-  server.listen(port, () => {
-    logger.info({ port }, "Health server listening");
-  });
+server.on("error", (err: NodeJS.ErrnoException) => {
+  if (err.code !== "EADDRINUSE") {
+    logger.error({ err }, "Health server error");
+  }
+});
 
-  server.once("error", (err: NodeJS.ErrnoException) => {
-    if (err.code === "EADDRINUSE") {
-      if (attempt <= 5) {
-        logger.warn({ port, attempt }, `Port busy — retrying in 2s (attempt ${attempt}/5)`);
-        setTimeout(() => {
-          server.close();
-          startServer(attempt + 1);
-        }, 2000);
-      } else {
-        logger.warn({ port }, "Port still busy after 5 attempts — health server disabled, bot continues");
-      }
-    } else {
-      logger.error({ err }, "Health server error");
-    }
-  });
+function shutdown() {
+  server.closeAllConnections?.();
+  server.close();
+  client.destroy();
+  process.exit(0);
 }
 
-startServer();
+process.on("SIGTERM", shutdown);
+process.on("SIGINT", shutdown);
+
+server.listen(port, () => {
+  logger.info({ port }, "Health server listening");
+});
 
 client.login(token).catch((err) => {
   logger.error({ err }, "Failed to log in to Discord");
