@@ -1,4 +1,5 @@
-import { createServer } from "node:http";
+import { createServer, type Server } from "node:http";
+import { execSync } from "node:child_process";
 import { BotClient } from "./client";
 import { commands } from "./commands/index";
 import { events } from "./events/index";
@@ -41,7 +42,8 @@ process.on("uncaughtException", (err: NodeJS.ErrnoException) => {
 });
 
 const port = Number(process.env["PORT"] ?? 8080);
-const server = createServer((req, res) => {
+
+const server: Server = createServer((req, res) => {
   if (req.url === "/api/healthz") {
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end(JSON.stringify({ status: "ok", uptime: process.uptime() }));
@@ -51,25 +53,45 @@ const server = createServer((req, res) => {
   }
 });
 
-server.on("error", (err: NodeJS.ErrnoException) => {
-  if (err.code !== "EADDRINUSE") {
-    logger.error({ err }, "Health server error");
-  }
-});
-
 function shutdown() {
-  server.closeAllConnections?.();
-  server.close();
-  client.destroy();
+  try { server.closeAllConnections?.(); } catch {}
+  try { server.close(); } catch {}
+  try { client.destroy(); } catch {}
   process.exit(0);
 }
 
 process.on("SIGTERM", shutdown);
 process.on("SIGINT", shutdown);
 
-server.listen(port, () => {
-  logger.info({ port }, "Health server listening");
-});
+function listen(attempt = 1): void {
+  server.listen(port, () => {
+    logger.info({ port }, "Health server listening");
+  });
+
+  server.once("error", (err: NodeJS.ErrnoException) => {
+    if (err.code !== "EADDRINUSE") {
+      logger.error({ err }, "Health server error");
+      return;
+    }
+
+    logger.warn({ port, attempt }, `Port ${port} busy — clearing and retrying (${attempt}/5)`);
+
+    try {
+      execSync(`fuser -k ${port}/tcp`, { stdio: "ignore" });
+    } catch {}
+
+    if (attempt <= 5) {
+      setTimeout(() => {
+        server.removeAllListeners("error");
+        listen(attempt + 1);
+      }, 1000);
+    } else {
+      logger.warn({ port }, "Could not bind port — health server disabled, bot continues");
+    }
+  });
+}
+
+listen();
 
 client.login(token).catch((err) => {
   logger.error({ err }, "Failed to log in to Discord");
