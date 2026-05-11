@@ -53,15 +53,11 @@ const server: Server = createServer((req, res) => {
   }
 });
 
-function shutdown() {
-  try { server.closeAllConnections?.(); } catch {}
-  try { server.close(); } catch {}
-  try { client.destroy(); } catch {}
-  process.exit(0);
-}
-
-process.on("SIGTERM", shutdown);
-process.on("SIGINT", shutdown);
+server.on("error", (err: NodeJS.ErrnoException) => {
+  if (err.code !== "EADDRINUSE") {
+    logger.error({ err }, "Health server error");
+  }
+});
 
 function listen(attempt = 1): void {
   server.listen(port, () => {
@@ -69,24 +65,21 @@ function listen(attempt = 1): void {
   });
 
   server.once("error", (err: NodeJS.ErrnoException) => {
-    if (err.code !== "EADDRINUSE") {
-      logger.error({ err }, "Health server error");
-      return;
-    }
+    if (err.code !== "EADDRINUSE") return;
 
     logger.warn({ port, attempt }, `Port ${port} busy — clearing and retrying (${attempt}/5)`);
-
-    try {
-      execSync(`fuser -k ${port}/tcp`, { stdio: "ignore" });
-    } catch {}
+    try { execSync(`fuser -k ${port}/tcp`, { stdio: "ignore" }); } catch {}
 
     if (attempt <= 5) {
       setTimeout(() => {
         server.removeAllListeners("error");
+        server.on("error", (e: NodeJS.ErrnoException) => {
+          if (e.code !== "EADDRINUSE") logger.error({ err: e }, "Health server error");
+        });
         listen(attempt + 1);
-      }, 1000);
+      }, 1500);
     } else {
-      logger.warn({ port }, "Could not bind port — health server disabled, bot continues");
+      logger.warn({ port }, "Could not bind — health server disabled, bot continues");
     }
   });
 }
