@@ -34,13 +34,17 @@ process.on("unhandledRejection", (err) => {
   logger.error({ err }, "Unhandled promise rejection");
 });
 
-process.on("uncaughtException", (err) => {
+process.on("uncaughtException", (err: NodeJS.ErrnoException) => {
+  if (err.code === "EADDRINUSE") {
+    logger.warn({ port: err.port }, "Port in use — ignoring, bot continues running");
+    return;
+  }
   logger.error({ err }, "Uncaught exception");
   process.exit(1);
 });
 
 const port = Number(process.env["PORT"] ?? 8080);
-createServer((req, res) => {
+const server = createServer((req, res) => {
   if (req.url === "/api/healthz") {
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end(JSON.stringify({ status: "ok", uptime: process.uptime() }));
@@ -48,9 +52,31 @@ createServer((req, res) => {
     res.writeHead(404);
     res.end();
   }
-}).listen(port, () => {
-  logger.info({ port }, "Health server listening");
 });
+
+function startServer(attempt = 1): void {
+  server.listen(port, () => {
+    logger.info({ port }, "Health server listening");
+  });
+
+  server.once("error", (err: NodeJS.ErrnoException) => {
+    if (err.code === "EADDRINUSE") {
+      if (attempt <= 5) {
+        logger.warn({ port, attempt }, `Port busy — retrying in 2s (attempt ${attempt}/5)`);
+        setTimeout(() => {
+          server.close();
+          startServer(attempt + 1);
+        }, 2000);
+      } else {
+        logger.warn({ port }, "Port still busy after 5 attempts — health server disabled, bot continues");
+      }
+    } else {
+      logger.error({ err }, "Health server error");
+    }
+  });
+}
+
+startServer();
 
 client.login(token).catch((err) => {
   logger.error({ err }, "Failed to log in to Discord");
