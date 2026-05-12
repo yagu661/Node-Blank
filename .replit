@@ -9,14 +9,14 @@ expertMode = true
 GUILD_ID = "1498904036118892647"
 YOUTUBE_DL_PATH = "/nix/store/am2x1y1qyja0hbyjpffj7rcvycp9d644-yt-dlp-2025.6.30/bin/yt-dlp"
 DISCORD_TOKEN = "MTUwMTEwNjAyNDM0NDcxNTM3NQ.Gy6R2d.myZVFbQ1uks8LKbWR4YZw6o7odSPm-Cv0uRwbM"
+PORT = "3000"
 
 [[ports]]
-localPort = 8080
+localPort = 3000
 externalPort = 8080
 
-[[ports]]
-localPort = 8081
-externalPort = 80
-
+[[ports
 [nix]
 channel = "stable-25_05"
+run = "cd bot/artifacts/api-server && pnpm run dev"
+run = "cd bot/artifacts/api-server && pnpm run dev"
