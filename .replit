@@ -8,7 +8,6 @@ expertMode = true
 [userenv.shared]
 GUILD_ID = "1498904036118892647"
 YOUTUBE_DL_PATH = "/nix/store/am2x1y1qyja0hbyjpffj7rcvycp9d644-yt-dlp-2025.6.30/bin/yt-dlp"
-DISCORD_TOKEN = "MTUwMTEwNjAyNDM0NDcxNTM3NQ.Gt0XGJ.rIt4xLqoqZG6AAooK40A7s25igVG1xb8mH4-3Y"
 PORT = "9000"
 
 [[ports]]
@@ -26,3 +25,4 @@ externalPort = 9000
 [nix]
 channel = "stable-25_05"
 run = "cd bot/artifacts/api-server && pnpm run dev"
+packages = ["nano"]
