@@ -1,6 +1,5 @@
-
-import { Player, AudioFilters } from "discord-player";
-import { SpotifyExtractor, SoundCloudExtractor, BridgeProvider, BridgeSource } from "@discord-player/extractor";
+import { Player, AudioFilters, BridgeProvider, BridgeSource } from "discord-player";
+import { SpotifyExtractor, SoundCloudExtractor } from "@discord-player/extractor";
 
 // ... inside your setup block
 const player = new Player(client, {
