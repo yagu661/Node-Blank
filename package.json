@@ -1,0 +1,7 @@
+{
+  "name": "discord-bot",
+  "scripts": {
+    "build": "cd bot/artifacts/api-server && pnpm install && pnpm run build",
+    "start": "cd bot/artifacts/api-server && pnpm run start"
+  }
+}
