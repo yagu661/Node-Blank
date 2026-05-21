@@ -1,0 +1,11 @@
+[phases.setup]
+nixPkgs = ["nodejs", "pnpm"]
+
+[phases.install]
+cmds = ["npm install -g pnpm", "cd bot/artifacts/api-server && pnpm install"]
+
+[phases.build]
+cmds = ["cd bot/artifacts/api-server && pnpm run build"]
+
+[start]
+cmd = "cd bot/artifacts/api-server && pnpm run start"
