@@ -15,7 +15,7 @@ AudioFilters.define("echo"      as any, "aecho=0.8:0.9:1000:0.3");
 AudioFilters.define("pitch"     as any, "asetrate=48000*1.15,aresample=48000");
 
 const _require = createRequire(import.meta.url);
-const ffmpegBin: string = _require("ffmpeg-static");
+const ffmpegBin: string = process.env["FFMPEG_PATH"] ?? _require("ffmpeg-static");
 
 const YTDLP_PATH = process.env.YOUTUBE_DL_PATH ?? "yt-dlp";
 
