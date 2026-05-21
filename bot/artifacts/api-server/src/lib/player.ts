@@ -17,7 +17,8 @@ import { SpotifyExtractor, SoundCloudExtractor } from "@discord-player/extractor
 import { EmbedBuilder, Events } from "discord.js";
 import { config } from "../config";
 import { getRelatedSongs } from "./ai";
-import type { BotClient } from "../client";
+import { client } from "../client"; 
+
 import { createRequire } from "node:module";
 import { spawn } from "node:child_process";
 import type { Readable } from "node:stream";
