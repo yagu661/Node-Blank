@@ -1,4 +1,14 @@
+
 import { Player, AudioFilters } from "discord-player";
+import { SpotifyExtractor, SoundCloudExtractor, BridgeProvider, BridgeSource } from "@discord-player/extractor";
+
+// ... inside your setup block
+const player = new Player(client, {
+    bridgeProvider: new BridgeProvider(BridgeSource.SoundCloud)
+});
+
+
+
 
 import { SpotifyExtractor, SoundCloudExtractor } from "@discord-player/extractor";
 import { EmbedBuilder, Events } from "discord.js";
