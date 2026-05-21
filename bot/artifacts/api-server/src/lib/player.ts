@@ -1,5 +1,5 @@
 import { Player, AudioFilters } from "discord-player";
-import { YoutubeiExtractor } from "discord-player-youtubei";
+
 import { SpotifyExtractor, SoundCloudExtractor } from "@discord-player/extractor";
 import { EmbedBuilder, Events } from "discord.js";
 import { config } from "../config";
@@ -197,9 +197,7 @@ export async function initPlayer(client: BotClient): Promise<Player> {
     }
   });
 
-await player.extractors.register(YoutubeiExtractor, {
-  disablePlayer: false,
-});
+
 
   await player.extractors.register(SoundCloudExtractor, {});
   await player.extractors.register(SpotifyExtractor, {});
