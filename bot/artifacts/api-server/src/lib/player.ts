@@ -197,8 +197,8 @@ export async function initPlayer(client: BotClient): Promise<Player> {
     }
   });
 
-  await player.extractors.register(YoutubeiExtractor, {
-  streamType: 'opus',
+await player.extractors.register(YoutubeiExtractor, {
+  disablePlayer: false,
 });
 
   await player.extractors.register(SoundCloudExtractor, {});
