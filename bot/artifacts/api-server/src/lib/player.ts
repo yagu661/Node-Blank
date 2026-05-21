@@ -1,27 +1,17 @@
 import { Player, AudioFilters } from "discord-player";
 import { SpotifyExtractor, SoundCloudExtractor } from "@discord-player/extractor";
-
-
-// ... inside your setup block
-const player = new Player(client, {
-    bridgeProvider: {
-        bridgeSource: "soundcloud"
-    }
-});
-
-
-
-
-
-import { SpotifyExtractor, SoundCloudExtractor } from "@discord-player/extractor";
 import { EmbedBuilder, Events } from "discord.js";
 import { config } from "../config";
 import { getRelatedSongs } from "./ai";
-import { client } from "../client"; 
-
 import { createRequire } from "node:module";
 import { spawn } from "node:child_process";
 import type { Readable } from "node:stream";
+import type { BotClient } from "../client";
+
+const player = new Player(null as any, {});
+
+
+
 
 AudioFilters.define("bassboost" as any, "bass=g=20,dynaudnorm=f=200");
 AudioFilters.define("8d"        as any, "apulsator=hz=0.08");
@@ -218,6 +208,11 @@ export async function initPlayer(client: BotClient): Promise<Player> {
   clientId: process.env["SPOTIFY_CLIENT_ID"],
   clientSecret: process.env["SPOTIFY_CLIENT_SECRET"],
 });
+(player.options as any).bridgeProvider = {
+    bridgeSource: "soundcloud"
+};
+
+
 
   player.events.on("playerStart", (queue, track) => {
     console.log(`[playerStart] ${track.title}`);
