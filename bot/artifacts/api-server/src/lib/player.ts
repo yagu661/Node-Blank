@@ -200,7 +200,10 @@ export async function initPlayer(client: BotClient): Promise<Player> {
 
 
   await player.extractors.register(SoundCloudExtractor, {});
-  await player.extractors.register(SpotifyExtractor, {});
+  await player.extractors.register(SpotifyExtractor, {
+  clientId: process.env["SPOTIFY_CLIENT_ID"],
+  clientSecret: process.env["SPOTIFY_CLIENT_SECRET"],
+});
 
   player.events.on("playerStart", (queue, track) => {
     console.log(`[playerStart] ${track.title}`);
