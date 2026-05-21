@@ -3,4 +3,4 @@ RUN npm install -g pnpm
 WORKDIR /app
 COPY bot/ ./
 RUN cd artifacts/api-server && pnpm install --ignore-scripts && pnpm run build
-CMD ["sh", "-c", "cd /app/artifacts/api-server && pnpm run start"]
+CMD ["node", "--enable-source-maps", "/app/artifacts/api-server/dist/index.mjs"]
