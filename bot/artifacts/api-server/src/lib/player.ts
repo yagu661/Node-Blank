@@ -9,7 +9,7 @@ export function initPlayer(client: BotClient): void {
       name: "main",
       url: `${process.env["LAVALINK_HOST"] ?? "localhost"}:${process.env["LAVALINK_PORT"] ?? "443"}`,
       auth: process.env["LAVALINK_PASSWORD"] ?? "youshallnotpass",
-      secure: true,
+      secure: false,
     }],
     {
       resume: true,
