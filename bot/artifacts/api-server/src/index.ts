@@ -12,13 +12,13 @@ if (!token) {
   throw new Error("DISCORD_TOKEN environment variable is required but was not provided.");
 }
 
-const client = new BotClient();
-
-initPlayer(client).catch((err) => {
+const client = new BotClient
+try {
+  initPlayer(client);
+} catch (err) {
   logger.error({ err }, "Failed to initialize music player");
   process.exit(1);
-});
-
+}
 for (const command of commands) {
   client.commands.set(command.data.name, command);
 }
