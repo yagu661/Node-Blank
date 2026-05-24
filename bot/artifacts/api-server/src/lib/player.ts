@@ -1,13 +1,15 @@
+
 import { Shoukaku, Connectors } from "shoukaku";
 import type { BotClient } from "../client";
 
-export function initPlayer(client: BotClient) {
+export function initPlayer(client: BotClient): void {
   const shoukaku = new Shoukaku(
     new Connectors.DiscordJS(client),
     [{
       name: "main",
-      url: `${process.env["LAVALINK_HOST"]}:${process.env["LAVALINK_PORT"] ?? "2333"}`,
+      url: `${process.env["LAVALINK_HOST"] ?? "localhost"}:${process.env["LAVALINK_PORT"] ?? "443"}`,
       auth: process.env["LAVALINK_PASSWORD"] ?? "youshallnotpass",
+      secure: true,
     }],
     {
       resume: true,
@@ -20,7 +22,7 @@ export function initPlayer(client: BotClient) {
   });
 
   shoukaku.on("ready", (name) => {
-    console.log(`[Lavalink] Node ${name} ready!`);
+    console.log(`[Lavalink] Node ${name} is ready!`);
   });
 
   (client as any).shoukaku = shoukaku;
