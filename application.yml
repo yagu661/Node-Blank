@@ -1,48 +1,16 @@
 server:
   port: 2333
   address: 0.0.0.0
-plugins:
-  - dependency: "com.github.topi314.lavasrc:lavasrc-plugin:4.3.0"
-    repository: "https://maven.lavalink.rocks/releases"
 lavalink:
+  plugins:
+    - dependency: "com.github.topi314.lavasrc:lavasrc-plugin:4.3.0"
+      repository: "https://maven.lavalink.dev/releases"
   server:
     password: "youshallnotpass"
     sources:
       youtube: false
       soundcloud: true
-    filters:
-      volume: true
-      equalizer: true
-      bassboost: true
-pluginsConfig:
-  lavasrc:
-    providers:
-      - "spsearch:%ISRC%"
-      - "spsearch:%QUERY%"
-      - "scsearch:%QUERY%"
-    sources:
-      spotify:
-        clientId: "1d05f4f043904d099cd20652873f86ff"
-        clientSecret: "c33980434eaf4e7ab3def3ff2a9950e1"
-        countryCode: "IN"
-EOFcat > ~/workspace/application.yml << 'EOF'
-server:
-  port: 2333
-  address: 0.0.0.0
 plugins:
-  - dependency: "com.github.topi314.lavasrc:lavasrc-plugin:4.3.0"
-    repository: "https://maven.lavalink.rocks/releases"
-lavalink:
-  server:
-    password: "youshallnotpass"
-    sources:
-      youtube: false
-      soundcloud: true
-    filters:
-      volume: true
-      equalizer: true
-      bassboost: true
-pluginsConfig:
   lavasrc:
     providers:
       - "spsearch:%ISRC%"
