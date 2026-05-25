@@ -88,7 +88,7 @@ export const play: Command = {
       });
     }
 
-    const search = isUrl ? query : `spsearch:${query}`;
+    const search = isUrl && query.includes("spotify.com") ? query : isUrl ? query : `spsearch:${query}`;
     const result = await node.rest.resolve(search);
 
     if (!result?.data?.length) {
