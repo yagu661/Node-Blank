@@ -32,7 +32,7 @@ export const play: Command = {
       const node = shoukaku?.nodes.get("main");
       if (!node) return interaction.respond([]);
 
-      const result = await node.rest.resolve(`spsearch:${query}`);
+      const result = await node.rest.resolve(`ytsearch:${query}`);
       if (!result?.data?.length) return interaction.respond([]);
 
       const choices = result.data.slice(0, 10).map((t: any) => ({
@@ -88,7 +88,7 @@ export const play: Command = {
       });
     }
 
-    const search = isUrl && query.includes("spotify.com") ? query : isUrl ? query : `spsearch:${query}`;
+    const search = isUrl ? query : `ytsearch:${query}`;
     const result = await node.rest.resolve(search);
 
     if (!result?.data?.length) {
