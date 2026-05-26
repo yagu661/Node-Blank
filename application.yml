@@ -26,3 +26,4 @@ plugins:
     spotify:
       clientId: "1d05f4f043904d099cd20652873f86ff"
       clientSecret: "c33980434eaf4e7ab3def3ff2a9950e1"
+      countryCode: "IN"
