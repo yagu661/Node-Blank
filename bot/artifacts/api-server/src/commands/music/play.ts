@@ -31,7 +31,9 @@ export const play: Command = {
       const shoukaku = (interaction.client as any).shoukaku;
       const node = shoukaku?.nodes.get("main");
       if (!node) return interaction.respond([]);
-  const result = await node.rest.resolve(`ytsearch:${query}`);     if (!result?.data?.length) return interaction.respond([]);
+
+      const result = await node.rest.resolve(`spsearch:${query}`);
+      if (!result?.data?.length) return interaction.respond([]);
 
       const choices = result.data.slice(0, 10).map((t: any) => ({
         name: `${t.info.title} — ${t.info.author}`.slice(0, 100),
@@ -86,8 +88,8 @@ export const play: Command = {
       });
     }
 
-    const search = isUrl ? query : `ytsearch:${query}`;
-const result = await node.rest.resolve(search);
+    const search = isUrl ? query : `spsearch:${query}`;
+    const result = await node.rest.resolve(search);
 
     if (!result?.data?.length) {
       return void interaction.editReply({
@@ -100,7 +102,7 @@ const result = await node.rest.resolve(search);
       player = await shoukaku.joinVoiceChannel({
         guildId: interaction.guildId!,
         channelId: voiceChannel.id,
-        shardId: 0,
+        shardId: interaction.guild!.shardId,
       });
     }
 

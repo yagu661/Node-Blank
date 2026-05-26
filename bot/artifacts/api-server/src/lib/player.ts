@@ -1,4 +1,3 @@
-
 import { Shoukaku, Connectors } from "shoukaku";
 import type { BotClient } from "../client";
 
@@ -27,4 +26,4 @@ export function initPlayer(client: BotClient): void {
 
   (client as any).shoukaku = shoukaku;
   (client as any).queues = new Map();
-  }
+}
