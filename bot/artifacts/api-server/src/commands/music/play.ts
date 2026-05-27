@@ -8,12 +8,32 @@ import type { Command } from "../../types/index";
 const autocompleteCache = new Map<string, { results: { name: string; value: string }[]; ts: number }>();
 const CACHE_TTL = 30_000;
 
+const SOURCE_MAP: Record<string, string> = {
+  spotify: "spsearch",
+  youtube: "ytsearch",
+  applemusic: "amsearch",
+  soundcloud: "scsearch",
+  deezer: "dzsearch",
+};
+
 export const play: Command = {
   data: new SlashCommandBuilder()
     .setName("play")
-    .setDescription("🎵 Search Spotify, YouTube or paste a URL — Spotify-first, highest quality audio")
+    .setDescription("🎵 Play music from Spotify, YouTube, Apple Music, SoundCloud or Deezer")
     .addStringOption((o) =>
-      o.setName("query").setDescription("Song name, artist, or URL — even with typos!").setRequired(true).setAutocomplete(true)
+      o.setName("query").setDescription("Song name, artist, or URL").setRequired(true).setAutocomplete(true)
+    )
+    .addStringOption((o) =>
+      o.setName("source")
+        .setDescription("Music source (default: Spotify)")
+        .setRequired(false)
+        .addChoices(
+          { name: "🎧 Spotify", value: "spotify" },
+          { name: "🎵 YouTube", value: "youtube" },
+          { name: "🍎 Apple Music", value: "applemusic" },
+          { name: "☁️ SoundCloud", value: "soundcloud" },
+          { name: "🎶 Deezer", value: "deezer" },
+        )
     ),
   cooldown: 3,
 
@@ -32,7 +52,10 @@ export const play: Command = {
       const node = shoukaku?.nodes.get("main");
       if (!node) return interaction.respond([]);
 
-      const result = await node.rest.resolve(`ytsearch:${query}`);
+      const source = (interaction.options as any).getString("source") ?? "spotify";
+      const prefix = SOURCE_MAP[source] ?? "spsearch";
+
+      const result = await node.rest.resolve(`${prefix}:${query}`);
       if (!result?.data?.length) return interaction.respond([]);
 
       const choices = result.data.slice(0, 10).map((t: any) => ({
@@ -69,11 +92,13 @@ export const play: Command = {
     const perms = voiceChannel.permissionsFor(me!);
     if (!perms?.has(PermissionFlagsBits.Connect) || !perms?.has(PermissionFlagsBits.Speak)) {
       return void interaction.editReply({
-        embeds: [new EmbedBuilder().setColor(config.colors.error).setTitle("�lock Missing Permissions").setDescription("> I don't have permission to **Connect** or **Speak** in that channel.").setTimestamp().setFooter({ text: `⚡ ${config.embedFooter}` })],
+        embeds: [new EmbedBuilder().setColor(config.colors.error).setTitle("🔒 Missing Permissions").setDescription("> I don't have permission to **Connect** or **Speak** in that channel.").setTimestamp().setFooter({ text: `⚡ ${config.embedFooter}` })],
       });
     }
 
     const rawQuery = interaction.options.getString("query", true);
+    const source = interaction.options.getString("source") ?? "spotify";
+    const prefix = SOURCE_MAP[source] ?? "spsearch";
     const isUrl = rawQuery.startsWith("http://") || rawQuery.startsWith("https://");
     const correctedQuery = isUrl ? rawQuery : await correctSearchQuery(rawQuery);
     const query = correctedQuery || rawQuery;
@@ -88,8 +113,10 @@ export const play: Command = {
       });
     }
 
-    const search = isUrl ? query : `ytsearch:${query}`;
+    const search = isUrl ? query : `${prefix}:${query}`;
     const result = await node.rest.resolve(search);
+
+    console.log(`[play] loadType: ${result?.loadType}, dataLength: ${result?.data?.length}`);
 
     if (!result?.data?.length) {
       return void interaction.editReply({
@@ -120,11 +147,15 @@ export const play: Command = {
     for (const track of tracks) queue.tracks.push(track);
 
     if (!queue.current) {
+      console.log(`[play] Starting playback...`);
       await playNext(player, queue, shoukaku, interaction.guildId!);
     }
 
     const track = tracks[0];
     const correctionNote = wasCorrected ? `\n> 🔍 *Searched as: \`${track.info.title}\`*` : "";
+    const sourceEmoji: Record<string, string> = {
+      spotify: "🎧", youtube: "🎵", applemusic: "🍎", soundcloud: "☁️", deezer: "🎶"
+    };
 
     if (isPlaylist) {
       return void interaction.editReply({
@@ -153,6 +184,7 @@ export const play: Command = {
           .addFields(
             { name: "⏱️ Duration", value: msToTime(track.info.length), inline: true },
             { name: "👤 Requested by", value: `${interaction.user}`, inline: true },
+            { name: `${sourceEmoji[source]} Source`, value: source.charAt(0).toUpperCase() + source.slice(1), inline: true },
             { name: "♾️ AI Autoplay", value: "On — genre-matched songs auto-queue", inline: false },
           )
           .setTimestamp()
@@ -171,6 +203,8 @@ async function playNext(player: any, queue: any, shoukaku: any, guildId: string)
 
   const track = queue.tracks.shift();
   queue.current = track;
+
+  console.log(`[playNext] Playing: ${track.info.title}`);
 
   await player.playTrack({ track: track.encoded });
 
