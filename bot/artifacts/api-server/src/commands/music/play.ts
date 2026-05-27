@@ -118,7 +118,7 @@ export const play: Command = {
 
     console.log(`[play] loadType: ${result?.loadType}, dataLength: ${result?.data?.length}`);
 
-    if (!result?.data?.length) {
+    if (!result?.data || (Array.isArray(result.data) && !result.data.length)) {
       return void interaction.editReply({
         embeds: [new EmbedBuilder().setColor(config.colors.error).setTitle("❌ No Results").setDescription(`> No results found for \`${rawQuery}\`.`).setTimestamp().setFooter({ text: `⚡ ${config.embedFooter}` })],
       });
