@@ -127,10 +127,11 @@ export const play: Command = {
     let player = shoukaku.players.get(interaction.guildId!);
     if (!player) {
       player = await shoukaku.joinVoiceChannel({
-        guildId: interaction.guildId!,
-        channelId: voiceChannel.id,
-        shardId: interaction.guild!.shardId,
+        guildId: String(interaction.guildId!),
+        channelId: String(voiceChannel.id),
+        shardId: interaction.guild!.shardId ?? 0,
         deaf: true,
+        mute: false,
       });
     }
 
@@ -143,6 +144,8 @@ export const play: Command = {
 
     const isPlaylist = result.loadType === "playlist";
     const tracks = isPlaylist ? result.data.tracks : [result.data[0]];
+
+    console.log(`[play] isPlaylist: ${isPlaylist}, tracks: ${tracks?.length}`);
 
     for (const track of tracks) queue.tracks.push(track);
 
