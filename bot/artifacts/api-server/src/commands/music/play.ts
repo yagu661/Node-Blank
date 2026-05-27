@@ -143,7 +143,8 @@ export const play: Command = {
     }
 
     const isPlaylist = result.loadType === "playlist";
-    const tracks = isPlaylist ? result.data.tracks : [result.data[0]];
+const isTrack = result.loadType === "track";
+const tracks = isPlaylist ? result.data.tracks : isTrack ? [result.data] : [result.data[0]];
 
     console.log(`[play] isPlaylist: ${isPlaylist}, tracks: ${tracks?.length}`);
 
