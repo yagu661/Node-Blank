@@ -32,7 +32,7 @@ export const play: Command = {
       const node = shoukaku?.nodes.get("main");
       if (!node) return interaction.respond([]);
 
-      const result = await node.rest.resolve(`spsearch:${query}`);
+      const result = await node.rest.resolve(`ytsearch:${query}`);
       if (!result?.data?.length) return interaction.respond([]);
 
       const choices = result.data.slice(0, 10).map((t: any) => ({
@@ -69,7 +69,7 @@ export const play: Command = {
     const perms = voiceChannel.permissionsFor(me!);
     if (!perms?.has(PermissionFlagsBits.Connect) || !perms?.has(PermissionFlagsBits.Speak)) {
       return void interaction.editReply({
-        embeds: [new EmbedBuilder().setColor(config.colors.error).setTitle("🔒 Missing Permissions").setDescription("> I don't have permission to **Connect** or **Speak** in that channel.").setTimestamp().setFooter({ text: `⚡ ${config.embedFooter}` })],
+        embeds: [new EmbedBuilder().setColor(config.colors.error).setTitle("�lock Missing Permissions").setDescription("> I don't have permission to **Connect** or **Speak** in that channel.").setTimestamp().setFooter({ text: `⚡ ${config.embedFooter}` })],
       });
     }
 
@@ -88,7 +88,7 @@ export const play: Command = {
       });
     }
 
-    const search = isUrl ? query : `spsearch:${query}`;
+    const search = isUrl ? query : `ytsearch:${query}`;
     const result = await node.rest.resolve(search);
 
     if (!result?.data?.length) {
@@ -103,6 +103,7 @@ export const play: Command = {
         guildId: interaction.guildId!,
         channelId: voiceChannel.id,
         shardId: interaction.guild!.shardId,
+        deaf: true,
       });
     }
 
