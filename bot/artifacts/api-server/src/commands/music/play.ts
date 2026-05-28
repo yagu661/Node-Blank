@@ -108,13 +108,20 @@ export const play: Command = {
     // Join voice channel first
     let player = shoukaku.players.get(interaction.guildId!);
     if (!player) {
-      player = await shoukaku.joinVoiceChannel({
-        guildId: String(interaction.guildId!),
-        channelId: String(voiceChannel.id),
-        shardId: interaction.guild!.shardId ?? 0,
-        deaf: true,
-        mute: false,
-      });
+      try {
+        player = await shoukaku.joinVoiceChannel({
+          guildId: String(interaction.guildId!),
+          channelId: String(voiceChannel.id),
+          shardId: interaction.guild!.shardId ?? 0,
+          deaf: true,
+          mute: false,
+        });
+      } catch (err: any) {
+        console.error("[joinVoiceChannel error]", err.message);
+        return void interaction.editReply({
+          embeds: [new EmbedBuilder().setColor(config.colors.error).setTitle("❌ Failed to Join").setDescription(`> Could not join voice channel: \`${err.message}\``).setTimestamp().setFooter({ text: `⚡ ${config.embedFooter}` })],
+        });
+      }
     }
 
     const rawQuery = interaction.options.getString("query", true);
