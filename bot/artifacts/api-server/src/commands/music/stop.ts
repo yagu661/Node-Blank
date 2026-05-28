@@ -1,32 +1,37 @@
-import { SlashCommandBuilder, EmbedBuilder, GuildMember } from "discord.js";
-import { MUSIC_COLOR } from "../../lib/musicUtils";
-import { getQueueForMember } from "../../lib/queueHelper";
+import { SlashCommandBuilder, EmbedBuilder } from "discord.js";
 import { config } from "../../config";
+import { MUSIC_COLOR } from "../../lib/musicUtils";
 import type { Command } from "../../types/index";
 
 export const stop: Command = {
   data: new SlashCommandBuilder()
     .setName("stop")
-    .setDescription("⏹️ Stop playback, wipe the queue and disconnect from the voice channel"),
-  cooldown: 3,
+    .setDescription("⏹️ Stop music and clear the queue"),
+  cooldown: 2,
+
   async execute(interaction) {
     await interaction.deferReply();
-    const queue = getQueueForMember(interaction.member as GuildMember);
 
-    if (!queue) {
+    const shoukaku = (interaction.client as any).shoukaku;
+    const queues = (interaction.client as any).queues;
+    const player = shoukaku.players.get(interaction.guildId!);
+
+    if (!player) {
       return void interaction.editReply({
-        embeds: [new EmbedBuilder().setColor(config.colors.error).setTitle("❌ Nothing Playing").setDescription("> There is nothing currently playing!").setTimestamp().setFooter({ text: `⚡ ${config.embedFooter}` })],
+        embeds: [new EmbedBuilder().setColor(config.colors.error).setTitle("❌ Nothing Playing").setDescription("> There is nothing to stop!").setTimestamp().setFooter({ text: `⚡ ${config.embedFooter}` })],
       });
     }
 
-    queue.delete();
+    queues.delete(interaction.guildId!);
+    await player.stopTrack();
+    shoukaku.leaveVoiceChannel(interaction.guildId!);
 
     return void interaction.editReply({
       embeds: [
         new EmbedBuilder()
           .setColor(MUSIC_COLOR)
           .setTitle("⏹️ Stopped")
-          .setDescription("> Music stopped, queue cleared and disconnected from the voice channel.")
+          .setDescription("> Music stopped and queue cleared!")
           .setTimestamp()
           .setFooter({ text: `⚡ ${config.embedFooter}` }),
       ],

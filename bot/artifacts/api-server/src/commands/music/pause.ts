@@ -1,39 +1,34 @@
-import { SlashCommandBuilder, EmbedBuilder, GuildMember } from "discord.js";
-import { MUSIC_COLOR } from "../../lib/musicUtils";
-import { getQueueForMember } from "../../lib/queueHelper";
+import { SlashCommandBuilder, EmbedBuilder } from "discord.js";
 import { config } from "../../config";
+import { MUSIC_COLOR } from "../../lib/musicUtils";
 import type { Command } from "../../types/index";
 
 export const pause: Command = {
   data: new SlashCommandBuilder()
     .setName("pause")
-    .setDescription("⏸️ Pause the current track — resume it any time with /resume"),
-  cooldown: 3,
+    .setDescription("⏸️ Pause the current track"),
+  cooldown: 2,
+
   async execute(interaction) {
     await interaction.deferReply();
-    const queue = getQueueForMember(interaction.member as GuildMember);
 
-    if (!queue?.isPlaying()) {
+    const shoukaku = (interaction.client as any).shoukaku;
+    const player = shoukaku.players.get(interaction.guildId!);
+
+    if (!player) {
       return void interaction.editReply({
-        embeds: [new EmbedBuilder().setColor(config.colors.error).setTitle("❌ Nothing Playing").setDescription("> There is nothing currently playing!").setTimestamp().setFooter({ text: `⚡ ${config.embedFooter}` })],
+        embeds: [new EmbedBuilder().setColor(config.colors.error).setTitle("❌ Nothing Playing").setDescription("> There is nothing to pause!").setTimestamp().setFooter({ text: `⚡ ${config.embedFooter}` })],
       });
     }
 
-    if (queue.node.isPaused()) {
-      return void interaction.editReply({
-        embeds: [new EmbedBuilder().setColor(config.colors.warning).setTitle("⚠️ Already Paused").setDescription("> The track is already paused. Use `/resume` to continue.").setTimestamp().setFooter({ text: `⚡ ${config.embedFooter}` })],
-      });
-    }
-
-    queue.node.pause();
+    await player.setPaused(true);
 
     return void interaction.editReply({
       embeds: [
         new EmbedBuilder()
           .setColor(MUSIC_COLOR)
           .setTitle("⏸️ Paused")
-          .setDescription(`> **${queue.currentTrack!.title}** has been paused.\n> Use \`/resume\` to continue.`)
-          .setThumbnail(queue.currentTrack!.thumbnail)
+          .setDescription("> Music paused! Use `/resume` to continue.")
           .setTimestamp()
           .setFooter({ text: `⚡ ${config.embedFooter}` }),
       ],

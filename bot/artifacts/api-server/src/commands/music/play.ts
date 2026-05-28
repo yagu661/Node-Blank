@@ -96,14 +96,6 @@ export const play: Command = {
       });
     }
 
-    const rawQuery = interaction.options.getString("query", true);
-    const source = interaction.options.getString("source") ?? "spotify";
-    const prefix = SOURCE_MAP[source] ?? "spsearch";
-    const isUrl = rawQuery.startsWith("http://") || rawQuery.startsWith("https://");
-    const correctedQuery = isUrl ? rawQuery : await correctSearchQuery(rawQuery);
-    const query = correctedQuery || rawQuery;
-    const wasCorrected = !isUrl && query.toLowerCase() !== rawQuery.toLowerCase();
-
     const shoukaku = (interaction.client as any).shoukaku;
     const node = shoukaku?.nodes.get("main");
 
@@ -113,17 +105,7 @@ export const play: Command = {
       });
     }
 
-    const search = isUrl ? query : `${prefix}:${query}`;
-    const result = await node.rest.resolve(search);
-
-    console.log(`[play] loadType: ${result?.loadType}, dataLength: ${result?.data?.length}`);
-
-    if (!result?.data || (Array.isArray(result.data) && !result.data.length)) {
-      return void interaction.editReply({
-        embeds: [new EmbedBuilder().setColor(config.colors.error).setTitle("❌ No Results").setDescription(`> No results found for \`${rawQuery}\`.`).setTimestamp().setFooter({ text: `⚡ ${config.embedFooter}` })],
-      });
-    }
-
+    // Join voice channel first
     let player = shoukaku.players.get(interaction.guildId!);
     if (!player) {
       player = await shoukaku.joinVoiceChannel({
@@ -135,6 +117,26 @@ export const play: Command = {
       });
     }
 
+    const rawQuery = interaction.options.getString("query", true);
+    const source = interaction.options.getString("source") ?? "spotify";
+    const prefix = SOURCE_MAP[source] ?? "spsearch";
+    const isUrl = rawQuery.startsWith("http://") || rawQuery.startsWith("https://");
+    const correctedQuery = isUrl ? rawQuery : await correctSearchQuery(rawQuery);
+    const query = correctedQuery || rawQuery;
+    const wasCorrected = !isUrl && query.toLowerCase() !== rawQuery.toLowerCase();
+
+    const search = isUrl ? query : `${prefix}:${query}`;
+    const result = await node.rest.resolve(search);
+
+    console.log(`[play] loadType: ${result?.loadType}, data:`, typeof result?.data);
+
+    if (!result?.data || (Array.isArray(result.data) && !result.data.length)) {
+      shoukaku.leaveVoiceChannel(interaction.guildId!);
+      return void interaction.editReply({
+        embeds: [new EmbedBuilder().setColor(config.colors.error).setTitle("❌ No Results").setDescription(`> No results found for \`${rawQuery}\`.`).setTimestamp().setFooter({ text: `⚡ ${config.embedFooter}` })],
+      });
+    }
+
     const queues = (interaction.client as any).queues;
     let queue = queues.get(interaction.guildId!);
     if (!queue) {
@@ -143,15 +145,12 @@ export const play: Command = {
     }
 
     const isPlaylist = result.loadType === "playlist";
-const isTrack = result.loadType === "track";
-const tracks = isPlaylist ? result.data.tracks : isTrack ? [result.data] : [result.data[0]];
-
-    console.log(`[play] isPlaylist: ${isPlaylist}, tracks: ${tracks?.length}`);
+    const isTrack = result.loadType === "track";
+    const tracks = isPlaylist ? result.data.tracks : isTrack ? [result.data] : [result.data[0]];
 
     for (const track of tracks) queue.tracks.push(track);
 
     if (!queue.current) {
-      console.log(`[play] Starting playback...`);
       await playNext(player, queue, shoukaku, interaction.guildId!);
     }
 
@@ -198,10 +197,10 @@ const tracks = isPlaylist ? result.data.tracks : isTrack ? [result.data] : [resu
   },
 };
 
-async function playNext(player: any, queue: any, shoukaku: any, guildId: string) {
+export async function playNext(player: any, queue: any, shoukaku: any, guildId: string) {
   if (!queue.tracks.length) {
     queue.current = null;
-    shoukaku.leaveVoiceChannel(guildId);
+    if (!queue.is247) shoukaku.leaveVoiceChannel(guildId);
     return;
   }
 
@@ -209,7 +208,6 @@ async function playNext(player: any, queue: any, shoukaku: any, guildId: string)
   queue.current = track;
 
   console.log(`[playNext] Playing: ${track.info.title}`);
-
   await player.playTrack({ track: track.encoded });
 
   if (queue.channel) {

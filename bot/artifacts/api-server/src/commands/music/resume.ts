@@ -1,39 +1,34 @@
-import { SlashCommandBuilder, EmbedBuilder, GuildMember } from "discord.js";
-import { MUSIC_COLOR } from "../../lib/musicUtils";
-import { getQueueForMember } from "../../lib/queueHelper";
+import { SlashCommandBuilder, EmbedBuilder } from "discord.js";
 import { config } from "../../config";
+import { MUSIC_COLOR } from "../../lib/musicUtils";
 import type { Command } from "../../types/index";
 
 export const resume: Command = {
   data: new SlashCommandBuilder()
     .setName("resume")
-    .setDescription("▶️ Resume a paused track and continue playback where you left off"),
-  cooldown: 3,
+    .setDescription("▶️ Resume the paused track"),
+  cooldown: 2,
+
   async execute(interaction) {
     await interaction.deferReply();
-    const queue = getQueueForMember(interaction.member as GuildMember);
 
-    if (!queue) {
+    const shoukaku = (interaction.client as any).shoukaku;
+    const player = shoukaku.players.get(interaction.guildId!);
+
+    if (!player) {
       return void interaction.editReply({
-        embeds: [new EmbedBuilder().setColor(config.colors.error).setTitle("❌ Nothing Playing").setDescription("> There is nothing currently playing!").setTimestamp().setFooter({ text: `⚡ ${config.embedFooter}` })],
+        embeds: [new EmbedBuilder().setColor(config.colors.error).setTitle("❌ Nothing Playing").setDescription("> There is nothing to resume!").setTimestamp().setFooter({ text: `⚡ ${config.embedFooter}` })],
       });
     }
 
-    if (!queue.node.isPaused()) {
-      return void interaction.editReply({
-        embeds: [new EmbedBuilder().setColor(config.colors.warning).setTitle("⚠️ Not Paused").setDescription("> The track is not paused. Use `/pause` to pause it.").setTimestamp().setFooter({ text: `⚡ ${config.embedFooter}` })],
-      });
-    }
-
-    queue.node.resume();
+    await player.setPaused(false);
 
     return void interaction.editReply({
       embeds: [
         new EmbedBuilder()
           .setColor(MUSIC_COLOR)
           .setTitle("▶️ Resumed")
-          .setDescription(`> **${queue.currentTrack!.title}** is now playing again.`)
-          .setThumbnail(queue.currentTrack!.thumbnail)
+          .setDescription("> Music resumed!")
           .setTimestamp()
           .setFooter({ text: `⚡ ${config.embedFooter}` }),
       ],

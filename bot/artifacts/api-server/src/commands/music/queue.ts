@@ -1,55 +1,38 @@
-import { SlashCommandBuilder, EmbedBuilder, GuildMember } from "discord.js";
-import { MUSIC_COLOR } from "../../lib/musicUtils";
-import { getQueueForMember } from "../../lib/queueHelper";
+import { SlashCommandBuilder, EmbedBuilder } from "discord.js";
 import { config } from "../../config";
+import { MUSIC_COLOR } from "../../lib/musicUtils";
 import type { Command } from "../../types/index";
-
-const PAGE_SIZE = 10;
 
 export const queue: Command = {
   data: new SlashCommandBuilder()
     .setName("queue")
-    .setDescription("<a:rules_book2:1501544101336580146> Browse the full music queue — paginated, clean and easy to read")
-    .addIntegerOption((o) =>
-      o.setName("page").setDescription("Page number").setMinValue(1).setRequired(false)
-    ),
-  cooldown: 3,
+    .setDescription("📋 Show the current queue"),
+  cooldown: 2,
+
   async execute(interaction) {
     await interaction.deferReply();
-    const q = getQueueForMember(interaction.member as GuildMember);
 
-    if (!q?.currentTrack) {
+    const queues = (interaction.client as any).queues;
+    const queue = queues.get(interaction.guildId!);
+
+    if (!queue?.current && !queue?.tracks?.length) {
       return void interaction.editReply({
-        embeds: [new EmbedBuilder().setColor(config.colors.error).setTitle("❌ Empty Queue").setDescription("> The queue is empty! Use `/play` to add some tracks.").setTimestamp().setFooter({ text: `⚡ ${config.embedFooter}` })],
+        embeds: [new EmbedBuilder().setColor(config.colors.error).setTitle("❌ Empty Queue").setDescription("> No tracks in queue!").setTimestamp().setFooter({ text: `⚡ ${config.embedFooter}` })],
       });
     }
 
-    const tracks    = q.tracks.toArray();
-    const totalPages = Math.max(1, Math.ceil(tracks.length / PAGE_SIZE));
-    const page       = Math.min(interaction.options.getInteger("page") ?? 1, totalPages);
-    const start      = (page - 1) * PAGE_SIZE;
-    const pageTracks = tracks.slice(start, start + PAGE_SIZE);
-
-    const trackList = pageTracks.length > 0
-      ? pageTracks.map((t, i) =>
-          `\`${start + i + 1}.\` **[${t.title}](${t.url})** — \`${t.duration}\` — ${t.requestedBy ?? "Unknown"}`
-        ).join("\n")
-      : "> No more tracks on this page.";
+    const tracks = queue.tracks.slice(0, 10).map((t: any, i: number) =>
+      `> **${i + 1}.** [${t.info.title}](${t.info.uri}) — ${t.info.author}`
+    ).join("\n");
 
     return void interaction.editReply({
       embeds: [
         new EmbedBuilder()
           .setColor(MUSIC_COLOR)
-          .setTitle("<a:rules_book2:1501544101336580146> Music Queue")
-          .setDescription(
-            `**🎵 Now Playing:**\n` +
-            `> **[${q.currentTrack.title}](${q.currentTrack.url})** — \`${q.currentTrack.duration}\`\n\n` +
-            (tracks.length > 0 ? `**Up Next:**\n${trackList}` : "> No tracks queued. Add more with `/play`!"),
-          )
+          .setTitle("📋 Queue")
           .addFields(
-            { name: "🎶 Total Tracks", value: `\`${tracks.length + 1}\``,      inline: true },
-            { name: "📄 Page",         value: `\`${page} / ${totalPages}\``,   inline: true },
-            { name: "🔊 Volume",       value: `\`${q.node.volume}%\``,         inline: true },
+            { name: "🎵 Now Playing", value: queue.current ? `> [${queue.current.info.title}](${queue.current.info.uri})` : "> Nothing", inline: false },
+            { name: `📋 Up Next (${queue.tracks.length} tracks)`, value: tracks || "> No more tracks", inline: false },
           )
           .setTimestamp()
           .setFooter({ text: `⚡ ${config.embedFooter}` }),

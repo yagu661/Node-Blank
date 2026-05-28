@@ -3,36 +3,34 @@ import { config } from "../../config";
 import { MUSIC_COLOR } from "../../lib/musicUtils";
 import type { Command } from "../../types/index";
 
-export const volume: Command = {
+export const leave: Command = {
   data: new SlashCommandBuilder()
-    .setName("volume")
-    .setDescription("🔊 Set the volume")
-    .addIntegerOption((o) =>
-      o.setName("level").setDescription("Volume level (0-100)").setRequired(true).setMinValue(0).setMaxValue(100)
-    ),
+    .setName("leave")
+    .setDescription("👋 Make the bot leave the voice channel"),
   cooldown: 2,
 
   async execute(interaction) {
     await interaction.deferReply();
 
     const shoukaku = (interaction.client as any).shoukaku;
+    const queues = (interaction.client as any).queues;
     const player = shoukaku.players.get(interaction.guildId!);
 
     if (!player) {
       return void interaction.editReply({
-        embeds: [new EmbedBuilder().setColor(config.colors.error).setTitle("❌ Nothing Playing").setDescription("> Nothing is playing!").setTimestamp().setFooter({ text: `⚡ ${config.embedFooter}` })],
+        embeds: [new EmbedBuilder().setColor(config.colors.error).setTitle("❌ Not Connected").setDescription("> I'm not in a voice channel!").setTimestamp().setFooter({ text: `⚡ ${config.embedFooter}` })],
       });
     }
 
-    const level = interaction.options.getInteger("level", true);
-    await player.setGlobalVolume(level);
+    queues.delete(interaction.guildId!);
+    shoukaku.leaveVoiceChannel(interaction.guildId!);
 
     return void interaction.editReply({
       embeds: [
         new EmbedBuilder()
           .setColor(MUSIC_COLOR)
-          .setTitle("🔊 Volume")
-          .setDescription(`> Volume set to **${level}%**`)
+          .setTitle("👋 Left")
+          .setDescription("> Left the voice channel!")
           .setTimestamp()
           .setFooter({ text: `⚡ ${config.embedFooter}` }),
       ],

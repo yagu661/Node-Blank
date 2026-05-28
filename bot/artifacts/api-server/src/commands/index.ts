@@ -28,6 +28,9 @@ import { softban } from "./moderation/advanced/softban";
 import { tempban } from "./moderation/advanced/tempban";
 import { role } from "./moderation/advanced/role";
 import { banlist } from "./moderation/advanced/banlist";
+import { join } from "./music/join";
+
+import { leave } from"./music/leave";
 import { play } from "./music/play";
 import { toggle247 } from "./music/247";
 import { disable247 } from "./music/247off";
@@ -45,6 +48,7 @@ import { remove } from "./music/remove";
 import { seek } from "./music/seek";
 import type { Command } from "../types/index";
 
+
 export const commands: Command[] = [
   ping, help, info, status, serverinfo, userinfo, avatar,
   ban, kick, unban, unbanAll,
@@ -55,5 +59,5 @@ export const commands: Command[] = [
   nick, hide, unhide, clear,
   warns, softban, tempban, role, banlist,
   play, toggle247, disable247, filter, pause, resume, skip, stop,
-  queue, nowplaying, volume, loop, shuffle, remove, seek,
+  queue, nowplaying, volume, loop, shuffle, remove, seek,join,leave
 ];
