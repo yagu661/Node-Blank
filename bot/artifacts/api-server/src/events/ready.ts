@@ -11,7 +11,20 @@ export const ready: BotEvent<Events.ClientReady> = {
     logger.info(`Logged in as ${client.user.tag} — serving ${client.guilds.cache.size} server(s)`);
 
     const rest = new REST().setToken(process.env["DISCORD_TOKEN"]!);
-    const body = commands.map((cmd) => cmd.data.toJSON());
+    const allCommands = [...commands.map((cmd) => cmd.data.toJSON())];
+
+// Add JS music commands
+const jsMusicPath = require("path").join(__dirname, "../commands/music");
+const fs = require("fs");
+if (fs.existsSync(jsMusicPath)) {
+  const jsFiles = fs.readdirSync(jsMusicPath).filter((f: string) => f.endsWith(".js"));
+  for (const file of jsFiles) {
+    const cmd = require(require("path").join(jsMusicPath, file));
+    if (cmd.data) allCommands.push(cmd.data.toJSON());
+  }
+}
+
+const body = allCommands;
 
     try {
       const guildId = process.env["GUILD_ID"];
