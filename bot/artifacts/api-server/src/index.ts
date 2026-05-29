@@ -12,13 +12,15 @@ if (!token) {
   throw new Error("DISCORD_TOKEN environment variable is required but was not provided.");
 }
 
-const client = new BotClient
+const client = new BotClient();
+
 try {
   initPlayer(client);
 } catch (err) {
   logger.error({ err }, "Failed to initialize music player");
   process.exit(1);
 }
+
 for (const command of commands) {
   client.commands.set(command.data.name, command);
 }
@@ -30,6 +32,14 @@ for (const event of events) {
     client.on(event.name, (...args) => event.execute(...(args as any)));
   }
 }
+
+client.once("ready", () => {
+  const poru = (client as any).poru;
+  if (poru) {
+    poru.init(client.user!.id);
+    logger.info("Poru initialized!");
+  }
+});
 
 process.on("unhandledRejection", (err) => {
   logger.error({ err }, "Unhandled promise rejection");
