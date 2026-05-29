@@ -58,6 +58,5 @@ export const commands: Command[] = [
   lock, lockAll, unlock, unlockAll,
   nick, hide, unhide, clear,
   warns, softban, tempban, role, banlist,
-  play, toggle247, disable247, filter, pause, resume, skip, stop,
-  queue, nowplaying, volume, loop, shuffle, remove, seek,join,leave
+
 ];
