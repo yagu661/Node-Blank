@@ -1,3 +1,5 @@
+import fs from "node:fs";
+import path from "node:path";
 import { createServer, type Server } from "node:http";
 import { execSync } from "node:child_process";
 import { BotClient } from "./client";
@@ -25,6 +27,17 @@ for (const command of commands) {
   client.commands.set(command.data.name, command);
 }
 
+// Load JS music commands from AeroX
+const jsMusicPath = path.join(__dirname, "commands", "music");
+if (fs.existsSync(jsMusicPath)) {
+  const jsFiles = fs.readdirSync(jsMusicPath).filter((f: string) => f.endsWith(".js"));
+  for (const file of jsFiles) {
+    const cmd = require(path.join(jsMusicPath, file));
+    if (cmd.data && cmd.execute) {
+      client.commands.set(cmd.data.name, cmd);
+    }
+  }
+}
 for (const event of events) {
   if (event.once) {
     client.once(event.name, (...args) => event.execute(...(args as any)));
